@@ -1,474 +1,536 @@
 "use client"
 
 import { useState } from "react"
+import { useAuth } from "@/contexts/AuthContext"
+import { useProtectedAction } from "@/components/ProtectedRoute"
+import PostCreationDialog from "@/components/PostCreationDialog"
+import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import {
   GraduationCap,
   Users,
   MessageSquare,
   BookOpen,
-  Shield,
-  Settings,
-  Bell,
-  BarChart3,
   UserCheck,
+  LogIn,
+  UserPlus,
+  Heart,
+  Share,
+  Clock,
+  MapPin,
+  Briefcase,
+  TrendingUp,
+  Star,
 } from "lucide-react"
-import { StatsCards } from "@/components/dashboard/stats-cards"
-import { RecentActivity } from "@/components/dashboard/recent-activity"
-import { UpcomingEvents } from "@/components/dashboard/upcoming-events"
-import { MentorshipSuggestions } from "@/components/dashboard/mentorship-suggestions"
-import { PlatformStats } from "@/components/admin/platform-stats"
-import { UserManagement } from "@/components/admin/user-management"
-import { ContentModeration } from "@/components/admin/content-moderation"
-import { SystemSettings } from "@/components/admin/system-settings"
-import { MentorshipDashboard } from "@/components/mentorship/mentorship-dashboard"
-import { DiscussionDashboard } from "@/components/discussions/discussion-dashboard"
-import { ProfileDashboard } from "@/components/profile/profile-dashboard"
+import dynamic from "next/dynamic"
+
+// Dynamically import heavy components for better code splitting
+const StatsCards = dynamic(() => import("@/components/dashboard/stats-cards").then(mod => ({ default: mod.StatsCards })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-24 rounded"></div>,
+  ssr: false
+})
+
+const RecentActivity = dynamic(() => import("@/components/dashboard/recent-activity").then(mod => ({ default: mod.RecentActivity })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>,
+  ssr: false
+})
+
+const UpcomingEvents = dynamic(() => import("@/components/dashboard/upcoming-events").then(mod => ({ default: mod.UpcomingEvents })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>,
+  ssr: false
+})
+
+const MentorshipSuggestions = dynamic(() => import("@/components/dashboard/mentorship-suggestions").then(mod => ({ default: mod.MentorshipSuggestions })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>,
+  ssr: false
+})
+
+// Admin components - only load when needed
+const PlatformStats = dynamic(() => import("@/components/admin/platform-stats").then(mod => ({ default: mod.PlatformStats })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>,
+  ssr: false
+})
+
+const UserManagement = dynamic(() => import("@/components/admin/user-management").then(mod => ({ default: mod.UserManagement })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>,
+  ssr: false
+})
+
+const ContentModeration = dynamic(() => import("@/components/admin/content-moderation").then(mod => ({ default: mod.ContentModeration })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>,
+  ssr: false
+})
+
+const SystemSettings = dynamic(() => import("@/components/admin/system-settings").then(mod => ({ default: mod.SystemSettings })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>,
+  ssr: false
+})
+
+// Other dashboard components
+const MentorshipDashboard = dynamic(() => import("@/components/mentorship/mentorship-dashboard").then(mod => ({ default: mod.MentorshipDashboard })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>,
+  ssr: false
+})
+
+const DiscussionDashboard = dynamic(() => import("@/components/discussions/discussion-dashboard").then(mod => ({ default: mod.DiscussionDashboard })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>,
+  ssr: false
+})
+
+const ProfileDashboard = dynamic(() => import("@/components/profile/profile-dashboard").then(mod => ({ default: mod.ProfileDashboard })), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>,
+  ssr: false
+})
 
 export default function CollegePlatform() {
-  const [user, setUser] = useState(null)
-  const [currentView, setCurrentView] = useState("dashboard")
-  const [loginForm, setLoginForm] = useState({ email: "", password: "" })
-  const [registerForm, setRegisterForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    role: "student",
-    graduationYear: "",
-    major: "",
-  })
+  const { user, userProfile } = useAuth()
+  const executeWithAuth = useProtectedAction()
+  const [selectedPost, setSelectedPost] = useState(null)
+  const [isPostDialogOpen, setIsPostDialogOpen] = useState(false)
+  const [posts, setPosts] = useState([
 
-  // Mock authentication
-  const handleLogin = (e) => {
-    e.preventDefault()
-    const isAdmin = loginForm.email.includes("admin")
-    setUser({
+    {
       id: 1,
-      name: isAdmin ? "Admin User" : "John Doe",
-      email: loginForm.email,
-      role: isAdmin ? "admin" : "student",
-      verified: true,
-      graduationYear: "2024",
+      author: "Sarah Johnson",
+      role: "Alumni",
       major: "Computer Science",
-    })
-  }
-
-  const handleRegister = (e) => {
-    e.preventDefault()
-    setUser({
+      graduationYear: "2021",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face&auto=format",
+      content: "Just landed my dream job at Google! Happy to mentor current CS students who are preparing for tech interviews. Feel free to reach out!",
+      timestamp: "2 hours ago",
+      likes: 24,
+      comments: 8,
+      tags: ["Career", "Tech", "Mentorship"]
+    },
+    {
       id: 2,
-      name: registerForm.name,
-      email: registerForm.email,
-      role: registerForm.role,
-      verified: false,
-      graduationYear: registerForm.graduationYear,
-      major: registerForm.major,
+      author: "Michael Chen",
+      role: "Student",
+      major: "Business Administration",
+      graduationYear: "2024",
+      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face&auto=format",
+      content: "Looking for study partners for the upcoming Finance exam. Anyone interested in forming a study group? We could meet at the library this weekend.",
+      timestamp: "4 hours ago",
+      likes: 12,
+      comments: 15,
+      tags: ["Study Group", "Finance"]
+    },
+    {
+      id: 3,
+      author: "Dr. Emily Rodriguez",
+      role: "Faculty",
+      major: "Psychology",
+      graduationYear: "Faculty",
+      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face&auto=format",
+      content: "Excited to announce our new Psychology Research Lab is now open for student volunteers! Great opportunity to gain hands-on research experience. Applications due next Friday.",
+      timestamp: "1 day ago",
+      likes: 45,
+      comments: 22,
+      tags: ["Research", "Opportunity", "Psychology"]
+    }
+  ])
+
+  const handleLike = (postId) => {
+    executeWithAuth(() => {
+      console.log('Liked post:', postId)
+      // Here you would update the like count
     })
   }
 
-  const handleLogout = () => {
-    setUser(null)
-    setCurrentView("dashboard")
-    setLoginForm({ email: "", password: "" })
-    setRegisterForm({ name: "", email: "", password: "", role: "student", graduationYear: "", major: "" })
+  const handleComment = (postId) => {
+    executeWithAuth(() => {
+      console.log('Comment on post:', postId)
+      // Here you would open comment dialog
+    })
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <GraduationCap className="h-12 w-12 text-blue-600" />
+  const handleConnect = (authorName) => {
+    executeWithAuth(() => {
+      console.log('Connect with:', authorName)
+      // Here you would send connection request
+    })
+  }
+
+  const handleCreatePost = () => {
+    executeWithAuth(() => {
+      setIsPostDialogOpen(true)
+    })
+  }
+
+  const handlePostCreated = (newPost) => {
+    setPosts(prev => [newPost, ...prev])
+  }
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 bg-grid-white/[0.1] bg-[size:16px_16px]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-transparent" />
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-8">
+              <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+                <GraduationCap className="h-16 w-16" />
+              </div>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">College Connect</h1>
-            <p className="text-gray-600">Connect with students, alumni, and mentors</p>
+            <h1 className="text-6xl font-bold mb-6 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+              College Connect
+            </h1>
+            <p className="text-xl mb-8 max-w-3xl mx-auto text-blue-100 leading-relaxed">
+              Join thousands of students, alumni, and faculty connecting, learning, and growing together in our vibrant academic community
+            </p>
+            
+            {!user && (
+              <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12">
+                <Link href="/login">
+                  <Button size="lg" variant="outline" className="px-8 py-3 text-white border-white/30 backdrop-blur-sm hover:bg-white/10 hover:border-white hover:text-white transition-all duration-300 rounded-full">
+                    <LogIn className="h-5 w-5 mr-2" />
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button size="lg" className="px-8 py-3 bg-white text-blue-600 hover:bg-blue-50 hover:scale-105 transition-all duration-300 rounded-full shadow-lg">
+                    <UserPlus className="h-5 w-5 mr-2" />
+                    Join Community
+                  </Button>
+                </Link>
+              </div>
+            )}
+            
+            <div className="grid md:grid-cols-3 gap-8 mt-16">
+              <div className="text-center group">
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 group-hover:bg-white/20 transition-all duration-300">
+                  <Users className="h-10 w-10" />
+                </div>
+                <h3 className="font-bold text-2xl mb-2">5,000+</h3>
+                <p className="text-blue-100 font-medium">Active Members</p>
+                <p className="text-blue-200 text-sm mt-1">Students, Alumni & Faculty</p>
+              </div>
+              <div className="text-center group">
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 group-hover:bg-white/20 transition-all duration-300">
+                  <MessageSquare className="h-10 w-10" />
+                </div>
+                <h3 className="font-bold text-2xl mb-2">500+</h3>
+                <p className="text-blue-100 font-medium">Monthly Discussions</p>
+                <p className="text-blue-200 text-sm mt-1">Knowledge & Networking</p>
+              </div>
+              <div className="text-center group">
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 group-hover:bg-white/20 transition-all duration-300">
+                  <TrendingUp className="h-10 w-10" />
+                </div>
+                <h3 className="font-bold text-2xl mb-2">95%</h3>
+                <p className="text-blue-100 font-medium">Success Rate</p>
+                <p className="text-blue-200 text-sm mt-1">Career Placement</p>
+              </div>
+            </div>
           </div>
-
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="login">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Welcome Back</CardTitle>
-                  <CardDescription>Sign in to your account</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={loginForm.email}
-                        onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                        placeholder="Try admin@college.edu for admin access"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        value={loginForm.password}
-                        onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <Button type="submit" className="w-full">
-                      Sign In
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="register">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Join Our Community</CardTitle>
-                  <CardDescription>Create your account</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleRegister} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input
-                        id="name"
-                        value={registerForm.name}
-                        onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-email">Email</Label>
-                      <Input
-                        id="reg-email"
-                        type="email"
-                        value={registerForm.email}
-                        onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-password">Password</Label>
-                      <Input
-                        id="reg-password"
-                        type="password"
-                        value={registerForm.password}
-                        onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="role">Role</Label>
-                        <select
-                          id="role"
-                          value={registerForm.role}
-                          onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="student">Student</option>
-                          <option value="alumni">Alumni</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="year">Graduation Year</Label>
-                        <Input
-                          id="year"
-                          value={registerForm.graduationYear}
-                          onChange={(e) => setRegisterForm({ ...registerForm, graduationYear: e.target.value })}
-                          placeholder="2024"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="major">Major/Field</Label>
-                      <Input
-                        id="major"
-                        value={registerForm.major}
-                        onChange={(e) => setRegisterForm({ ...registerForm, major: e.target.value })}
-                        placeholder="Computer Science"
-                      />
-                    </div>
-                    <Button type="submit" className="w-full">
-                      Create Account
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
         </div>
       </div>
-    )
-  }
 
-  if (user.role === "admin") {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <GraduationCap className="h-8 w-8 text-blue-600 mr-3" />
-                <h1 className="text-xl font-bold text-gray-900">College Connect Admin</h1>
-              </div>
-              <div className="flex items-center space-x-4">
-                <Button variant="ghost" size="sm">
-                  <Bell className="h-4 w-4" />
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid lg:grid-cols-12 gap-8">
+          {/* Left Sidebar */}
+          <div className="lg:col-span-3">
+            <Card className="mb-6 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center text-gray-800">
+                  <div className="p-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-lg mr-3">
+                    <Star className="h-4 w-4 text-white" />
+                  </div>
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button 
+                  className="w-full justify-start bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 hover:border-blue-300 transition-all duration-200" 
+                  onClick={handleCreatePost}
+                  variant="outline"
+                >
+                  <MessageSquare className="h-4 w-4 mr-3" />
+                  Create Post
                 </Button>
-                <Badge variant="destructive">Admin</Badge>
-                <span className="text-sm text-gray-700">{user.name}</span>
-                <Button variant="outline" size="sm" onClick={handleLogout}>
-                  Logout
+                <Link href="/alumni" className="w-full">
+                  <Button 
+                    className="w-full justify-start bg-green-50 hover:bg-green-100 text-green-700 border-green-200 hover:border-green-300 transition-all duration-200" 
+                    variant="outline"
+                  >
+                    <Users className="h-4 w-4 mr-3" />
+                    Connect with Alumni
+                  </Button>
+                </Link>
+                <Button 
+                  className="w-full justify-start bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200 hover:border-purple-300 transition-all duration-200" 
+                  onClick={() => executeWithAuth(() => console.log('Join study group'))}
+                  variant="outline"
+                >
+                  <BookOpen className="h-4 w-4 mr-3" />
+                  Join Study Groups
                 </Button>
-              </div>
-            </div>
+                {user && (
+                  <Link href="/profile" className="w-full">
+                    <Button className="w-full justify-start bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 hover:border-indigo-300 transition-all duration-200" variant="outline">
+                      <UserCheck className="h-4 w-4 mr-3" />
+                      Edit Profile
+                    </Button>
+                  </Link>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Trending Topics */}
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center text-gray-800">
+                  <div className="p-2 bg-gradient-to-r from-pink-400 to-purple-500 rounded-lg mr-3">
+                    <TrendingUp className="h-4 w-4 text-white" />
+                  </div>
+                  Trending Topics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { name: 'Career Advice', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+                    { name: 'Study Tips', color: 'bg-green-100 text-green-700 border-green-200' },
+                    { name: 'Internships', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+                    { name: 'Research', color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+                    { name: 'Networking', color: 'bg-pink-100 text-pink-700 border-pink-200' }
+                  ].map((topic) => (
+                    <Badge key={topic.name} className={`${topic.color} hover:scale-105 transition-transform cursor-pointer`}>
+                      #{topic.name.replace(' ', '')}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </header>
 
-        <div className="flex">
-          <nav className="w-64 bg-white shadow-sm min-h-screen border-r">
-            <div className="p-4">
-              <div className="space-y-2">
-                <Button
-                  variant={currentView === "dashboard" ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => setCurrentView("dashboard")}
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Dashboard
-                </Button>
-                <Button
-                  variant={currentView === "users" ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => setCurrentView("users")}
-                >
-                  <Users className="h-4 w-4 mr-2" />
-                  User Management
-                </Button>
-                <Button
-                  variant={currentView === "moderation" ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => setCurrentView("moderation")}
-                >
-                  <Shield className="h-4 w-4 mr-2" />
-                  Content Moderation
-                </Button>
-                <Button
-                  variant={currentView === "settings" ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => setCurrentView("settings")}
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  System Settings
-                </Button>
-              </div>
-            </div>
-          </nav>
-
-          <main className="flex-1 p-8">
-            {currentView === "dashboard" && (
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Platform Overview</h2>
-                <PlatformStats />
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <UserManagement />
-                  <ContentModeration />
+          {/* Main Feed */}
+          <div className="lg:col-span-6">
+            {/* Community Feed Header */}
+            <div className="mb-8">
+              <div className="flex items-center mb-4">
+                <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl mr-4">
+                  <MessageSquare className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">Community Feed</h2>
+                  <p className="text-gray-500 mt-1">Discover what's happening in your college community</p>
                 </div>
               </div>
-            )}
-            {currentView === "users" && (
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">User Management</h2>
-                <UserManagement />
-              </div>
-            )}
-            {currentView === "moderation" && (
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Content Moderation</h2>
-                <ContentModeration />
-              </div>
-            )}
-            {currentView === "settings" && (
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">System Settings</h2>
-                <SystemSettings />
-              </div>
-            )}
-          </main>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <GraduationCap className="h-8 w-8 text-blue-600 mr-3" />
-              <h1 className="text-xl font-bold text-gray-900">College Connect</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm">
-                <Bell className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setCurrentView("profile")}>
-                <Settings className="h-4 w-4" />
-              </Button>
-              <Badge variant={user.verified ? "default" : "secondary"}>
-                {user.verified ? "Verified" : "Pending Verification"}
-              </Badge>
-              <span className="text-sm text-gray-700">{user.name}</span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentView === "dashboard" && (
-          <>
-            <StatsCards user={user} />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-1 space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Shield className="h-5 w-5 mr-2" />
-                      Profile
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Name</p>
-                        <p className="text-gray-900">{user.name}</p>
+            {/* Posts */}
+            <div className="space-y-6">
+              {posts.map((post) => (
+                <Card key={post.id} className="border-0 shadow-lg bg-white/90 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
+                  <CardContent className="p-6">
+                    {/* Post Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center">
+                        <Image 
+                          src={post.avatar} 
+                          alt={post.author} 
+                          width={48}
+                          height={48}
+                          className="w-12 h-12 rounded-full mr-3"
+                          priority={false}
+                          placeholder="blur"
+                          blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkbHB0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyAgQTzSlT54b0/QTpfwcOvo+9lqiTg8y5Ec+/"
+                        />
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{post.author}</h4>
+                          <div className="flex items-center text-sm text-gray-500">
+                            <Badge variant="outline" className="mr-2 text-xs">
+                              {post.role}
+                            </Badge>
+                            <span>{post.major} • {post.graduationYear}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Role</p>
-                        <Badge variant="outline" className="capitalize">
-                          {user.role}
+                      <div className="flex items-center text-sm text-gray-500">
+                        <Clock className="h-4 w-4 mr-1" />
+                        {post.timestamp}
+                      </div>
+                    </div>
+
+                    {/* Post Content */}
+                    <p className="text-gray-700 mb-4 leading-relaxed">{post.content}</p>
+
+                    {/* Post Tags */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {post.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          #{tag}
                         </Badge>
+                      ))}
+                    </div>
+
+                    {/* Post Actions */}
+                    <div className="flex items-center justify-between pt-6 border-t border-gray-100/80">
+                      <div className="flex items-center space-x-4">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleLike(post.id)}
+                          className="text-gray-600 hover:text-red-500 hover:bg-red-50 rounded-full px-3 py-2 transition-all duration-200"
+                        >
+                          <Heart className="h-4 w-4 mr-2" />
+                          {post.likes}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleComment(post.id)}
+                          className="text-gray-600 hover:text-blue-500 hover:bg-blue-50 rounded-full px-3 py-2 transition-all duration-200"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          {post.comments}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-gray-600 hover:text-green-500 hover:bg-green-50 rounded-full px-3 py-2 transition-all duration-200"
+                        >
+                          <Share className="h-4 w-4 mr-2" />
+                          Share
+                        </Button>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Major</p>
-                        <p className="text-gray-900">{user.major}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Graduation Year</p>
-                        <p className="text-gray-900">{user.graduationYear}</p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        className="w-full mt-4 bg-transparent"
-                        onClick={() => setCurrentView("profile")}
-                      >
-                        Edit Profile
-                      </Button>
+                      {post.role === 'Alumni' && (
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleConnect(post.author)}
+                          className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-full px-4 py-2 transition-all duration-200 shadow-md hover:shadow-lg"
+                        >
+                          <UserCheck className="h-4 w-4 mr-2" />
+                          Connect
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
+              ))}
+            </div>
+          </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                  <Card
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => setCurrentView("mentorship")}
-                  >
-                    <CardContent className="p-6 text-center">
-                      <UserCheck className="h-8 w-8 text-blue-600 mx-auto mb-3" />
-                      <h3 className="font-semibold text-gray-900 mb-2">Find Mentors</h3>
-                      <p className="text-sm text-gray-600">Connect with alumni and industry professionals</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => setCurrentView("discussions")}
-                  >
-                    <CardContent className="p-6 text-center">
-                      <MessageSquare className="h-8 w-8 text-green-600 mx-auto mb-3" />
-                      <h3 className="font-semibold text-gray-900 mb-2">Discussion Rooms</h3>
-                      <p className="text-sm text-gray-600">Join conversations with your peers</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-6 text-center">
-                      <BookOpen className="h-8 w-8 text-purple-600 mx-auto mb-3" />
-                      <h3 className="font-semibold text-gray-900 mb-2">Blog & Resources</h3>
-                      <p className="text-sm text-gray-600">Share knowledge and learn from others</p>
-                    </CardContent>
-                  </Card>
+          {/* Right Sidebar */}
+          <div className="lg:col-span-3">
+            {/* Alumni Spotlight */}
+            <Card className="mb-6 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center text-gray-800">
+                  <div className="p-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-lg mr-3">
+                    <Users className="h-4 w-4 text-white" />
+                  </div>
+                  Alumni Spotlight
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <Image 
+                      src="https://images.unsplash.com/photo-1600486913747-55e5470d6f40?w=50&h=50&fit=crop&crop=face&auto=format"
+                      alt="Alumni" 
+                      width={40}
+                      height={40}
+                      className="w-10 h-10 rounded-full mr-3"
+                      placeholder="blur"
+                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkbHB0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyAgQTzSlT54b0/QTpfwcOvo+9lqiTg8y5Ec+/"
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">David Kim</p>
+                      <p className="text-xs text-gray-500">Software Engineer at Apple</p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => executeWithAuth(() => console.log('View profile'))}
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 hover:border-blue-300 rounded-full px-3 py-1 transition-all duration-200"
+                    >
+                      View
+                    </Button>
+                  </div>
+                  <div className="flex items-center">
+                    <Image 
+                      src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=50&h=50&fit=crop&crop=face&auto=format"
+                      alt="Alumni" 
+                      width={40}
+                      height={40}
+                      className="w-10 h-10 rounded-full mr-3"
+                      placeholder="blur"
+                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkbHB0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyAgQTzSlT54b0/QTpfwcOvo+9lqiTg8y5Ec+/"
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">Lisa Zhang</p>
+                      <p className="text-xs text-gray-500">Product Manager at Netflix</p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => executeWithAuth(() => console.log('View profile'))}
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 hover:border-blue-300 rounded-full px-3 py-1 transition-all duration-200"
+                    >
+                      View
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="lg:col-span-2 space-y-6">
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  <RecentActivity user={user} />
-                  <UpcomingEvents />
+            {/* Upcoming Events */}
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center text-gray-800">
+                  <div className="p-2 bg-gradient-to-r from-orange-400 to-red-500 rounded-lg mr-3">
+                    <Clock className="h-4 w-4 text-white" />
+                  </div>
+                  Upcoming Events
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-r-lg p-4 hover:shadow-md transition-shadow">
+                    <h4 className="font-semibold text-sm text-gray-800">Career Fair</h4>
+                    <div className="flex items-center text-xs text-gray-600 mt-2">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      Main Auditorium
+                    </div>
+                    <div className="flex items-center text-xs text-blue-600 mt-1">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Tomorrow, 10:00 AM
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-r-lg p-4 hover:shadow-md transition-shadow">
+                    <h4 className="font-semibold text-sm text-gray-800">Alumni Networking</h4>
+                    <div className="flex items-center text-xs text-gray-600 mt-2">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      Student Center
+                    </div>
+                    <div className="flex items-center text-xs text-green-600 mt-1">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Friday, 6:00 PM
+                    </div>
+                  </div>
                 </div>
-                <MentorshipSuggestions user={user} />
-              </div>
-            </div>
-          </>
-        )}
-
-        {currentView === "mentorship" && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Mentorship</h2>
-              <Button variant="outline" onClick={() => setCurrentView("dashboard")}>
-                Back to Dashboard
-              </Button>
-            </div>
-            <MentorshipDashboard user={user} />
+              </CardContent>
+            </Card>
           </div>
-        )}
-
-        {currentView === "discussions" && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Discussions</h2>
-              <Button variant="outline" onClick={() => setCurrentView("dashboard")}>
-                Back to Dashboard
-              </Button>
-            </div>
-            <DiscussionDashboard user={user} />
-          </div>
-        )}
-
-        {currentView === "profile" && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Profile Management</h2>
-                <p className="text-gray-600">Manage your profile information and privacy settings</p>
-              </div>
-              <Button variant="outline" onClick={() => setCurrentView("dashboard")}>
-                Back to Dashboard
-              </Button>
-            </div>
-            <ProfileDashboard user={user} />
-          </div>
-        )}
-      </main>
+        </div>
+      </div>
+      
+      {/* Post Creation Dialog */}
+      <PostCreationDialog 
+        isOpen={isPostDialogOpen}
+        onClose={() => setIsPostDialogOpen(false)}
+        onPostCreated={handlePostCreated}
+      />
     </div>
   )
+
 }

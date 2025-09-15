@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { auth, db } from "@/lib/firebase"
+import { auth, db, isFirebaseConfigured } from "@/lib/firebase"
 
 const AuthContext = createContext({})
 
@@ -17,49 +17,53 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Check if Firebase is available
-  const isFirebaseAvailable = auth && db
-
-  // Mock sign up function when Firebase is not available
+  // Sign up function with Firebase or mock implementation
   const signUp = async (email, password, userData) => {
-    if (!isFirebaseAvailable) {
-      // Mock implementation for demo
-      const mockUser = {
-        uid: "mock-uid-" + Date.now(),
-        email: email,
-        displayName: userData.name,
-        emailVerified: false,
-      }
-      setUser(mockUser)
-      setUserProfile({
-        uid: mockUser.uid,
-        name: userData.name,
-        email: email,
-        role: userData.role,
-        major: userData.major,
-        graduationYear: userData.graduationYear,
-        verified: false,
-        createdAt: new Date(),
-      })
-      return { user: mockUser, message: "Demo account created! Firebase not configured." }
-    }
+    setError(null)
+    setLoading(true)
 
     try {
+      if (!isFirebaseConfigured || !auth || !db) {
+        // Mock implementation for demo
+        const mockUser = {
+          uid: "mock-uid-" + Date.now(),
+          email: email,
+          displayName: userData.name,
+          emailVerified: false,
+        }
+        setUser(mockUser)
+        setUserProfile({
+          uid: mockUser.uid,
+          name: userData.name,
+          email: email,
+          role: userData.role,
+          major: userData.major,
+          graduationYear: userData.graduationYear,
+          verified: false,
+          createdAt: new Date(),
+        })
+        setLoading(false)
+        return { user: mockUser, message: "Demo account created! Firebase not configured." }
+      }
+
       const { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } = await import("firebase/auth")
       const { doc, setDoc } = await import("firebase/firestore")
 
-      const { user } = await createUserWithEmailAndPassword(auth, email, password)
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
 
       await updateProfile(user, { displayName: userData.name })
 
-      await setDoc(doc(db, "users", user.uid), {
+      // Create user profile in Firestore
+      const userProfileData = {
         uid: user.uid,
         name: userData.name,
         email: user.email,
-        role: userData.role,
-        major: userData.major,
-        graduationYear: userData.graduationYear,
+        role: userData.role || "student",
+        major: userData.major || "",
+        graduationYear: userData.graduationYear || "",
         verified: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -69,92 +73,160 @@ export const AuthProvider = ({ children }) => {
         interests: [],
         socialLinks: {},
         mentorshipStatus: userData.role === "alumni" ? "available" : "seeking",
-      })
+      }
 
-      await sendEmailVerification(user)
+      await setDoc(doc(db, "users", user.uid), userProfileData)
+      setUserProfile(userProfileData)
 
+      // Send email verification
+      try {
+        await sendEmailVerification(user)
+      } catch (emailError) {
+        console.warn("Could not send verification email:", emailError)
+      }
+
+      setLoading(false)
       return { user, message: "Account created successfully! Please check your email for verification." }
     } catch (error) {
-      throw error
+      setLoading(false)
+      setError(error.message)
+      throw new Error(error.message || "Failed to create account")
     }
   }
 
-  // Mock sign in function when Firebase is not available
+  // Sign in function with Firebase or mock implementation
   const signIn = async (email, password) => {
-    if (!isFirebaseAvailable) {
-      // Mock implementation for demo
-      const isAdmin = email.includes("admin")
-      const mockUser = {
-        uid: "mock-uid-" + Date.now(),
-        email: email,
-        displayName: isAdmin ? "Admin User" : "Demo User",
-        emailVerified: true,
-      }
-      setUser(mockUser)
-      setUserProfile({
-        uid: mockUser.uid,
-        name: mockUser.displayName,
-        email: email,
-        role: isAdmin ? "admin" : "student",
-        major: "Computer Science",
-        graduationYear: "2024",
-        verified: true,
-        createdAt: new Date(),
-      })
-      return { user: mockUser }
-    }
+    setError(null)
+    setLoading(true)
 
     try {
+      if (!isFirebaseConfigured || !auth || !db) {
+        // Mock implementation for demo
+        const isAdmin = email.includes("admin")
+        const mockUser = {
+          uid: "mock-uid-" + Date.now(),
+          email: email,
+          displayName: isAdmin ? "Admin User" : "Demo User",
+          emailVerified: true,
+        }
+        setUser(mockUser)
+        setUserProfile({
+          uid: mockUser.uid,
+          name: mockUser.displayName,
+          email: email,
+          role: isAdmin ? "admin" : "student",
+          major: "Computer Science",
+          graduationYear: "2024",
+          verified: true,
+          createdAt: new Date(),
+        })
+        setLoading(false)
+        return { user: mockUser }
+      }
+
       const { signInWithEmailAndPassword } = await import("firebase/auth")
-      const { user } = await signInWithEmailAndPassword(auth, email, password)
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
+      
+      // Fetch user profile after successful login
+      await fetchUserProfile(user.uid)
+      
+      setLoading(false)
       return { user }
     } catch (error) {
-      throw error
+      setLoading(false)
+      setError(error.message)
+      throw new Error(error.message || "Failed to sign in")
     }
   }
 
-  // Mock logout function
+  // Logout function
   const logout = async () => {
-    if (!isFirebaseAvailable) {
-      setUser(null)
-      setUserProfile(null)
-      return
-    }
-
+    setError(null)
+    
     try {
+      if (!isFirebaseConfigured || !auth) {
+        // Mock implementation
+        setUser(null)
+        setUserProfile(null)
+        return
+      }
+
       const { signOut } = await import("firebase/auth")
       await signOut(auth)
       setUser(null)
       setUserProfile(null)
     } catch (error) {
-      throw error
+      setError(error.message)
+      throw new Error(error.message || "Failed to sign out")
     }
   }
 
-  // Mock update profile function
+  // Update user profile function
   const updateUserProfile = async (updates) => {
-    if (!isFirebaseAvailable) {
-      setUserProfile((prev) => ({ ...prev, ...updates }))
-      return
-    }
-
+    setError(null)
+    
     try {
-      const { doc, updateDoc } = await import("firebase/firestore")
-      if (user) {
-        await updateDoc(doc(db, "users", user.uid), {
+      if (!isFirebaseConfigured || !db) {
+        // Mock implementation
+        setUserProfile((prev) => ({ ...prev, ...updates }))
+        return
+      }
+
+      if (!user) {
+        throw new Error("No user logged in")
+      }
+
+      const { doc, updateDoc, setDoc, getDoc } = await import("firebase/firestore")
+      const userDocRef = doc(db, "users", user.uid)
+      
+      // Check if user document exists
+      const docSnap = await getDoc(userDocRef)
+      
+      if (docSnap.exists()) {
+        // Update existing document
+        await updateDoc(userDocRef, {
           ...updates,
           updatedAt: new Date(),
         })
-        setUserProfile((prev) => ({ ...prev, ...updates }))
+      } else {
+        // Create new document if it doesn't exist
+        const newProfile = {
+          uid: user.uid,
+          name: updates.name || user.displayName || '',
+          email: user.email,
+          role: updates.role || 'student',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          profileComplete: false,
+          bio: '',
+          skills: [],
+          interests: [],
+          socialLinks: {},
+          mentorshipStatus: 'seeking',
+          ...updates
+        }
+        await setDoc(userDocRef, newProfile)
       }
+      
+      // Update local state
+      setUserProfile((prev) => ({ 
+        ...prev, 
+        ...updates, 
+        updatedAt: new Date() 
+      }))
+      
+      console.log('Profile updated successfully in Firebase')
     } catch (error) {
-      throw error
+      console.error('Error updating profile:', error)
+      setError(error.message)
+      throw new Error(error.message || "Failed to update profile")
     }
   }
 
-  // Mock fetch user profile function
+  // Fetch user profile function
   const fetchUserProfile = async (uid) => {
-    if (!isFirebaseAvailable) {
+    if (!isFirebaseConfigured || !db) {
       return userProfile
     }
 
@@ -166,49 +238,60 @@ export const AuthProvider = ({ children }) => {
       if (docSnap.exists()) {
         const profile = docSnap.data()
         setUserProfile(profile)
+        console.log('User profile fetched successfully:', profile)
         return profile
       } else {
-        console.log("No user profile found")
+        console.log("No user profile found for uid:", uid)
+        console.log("Profile will be created on first update")
+        setUserProfile(null)
         return null
       }
     } catch (error) {
       console.error("Error fetching user profile:", error)
-      throw error
+      setError(error.message)
+      return null
     }
   }
 
   // Listen for authentication state changes
   useEffect(() => {
-    if (!isFirebaseAvailable) {
+    if (!isFirebaseConfigured || !auth) {
       setLoading(false)
       return
     }
 
     const { onAuthStateChanged } = require("firebase/auth")
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUser(user)
-        await fetchUserProfile(user.uid)
-      } else {
-        setUser(null)
-        setUserProfile(null)
+      try {
+        if (user) {
+          setUser(user)
+          await fetchUserProfile(user.uid)
+        } else {
+          setUser(null)
+          setUserProfile(null)
+        }
+      } catch (error) {
+        console.error("Auth state change error:", error)
+        setError(error.message)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     })
 
     return () => unsubscribe()
-  }, [isFirebaseAvailable])
+  }, [isFirebaseConfigured])
 
   const value = {
     user,
     userProfile,
     loading,
+    error,
     signUp,
     signIn,
     logout,
     updateUserProfile,
     fetchUserProfile,
-    isFirebaseAvailable,
+    isFirebaseConfigured,
   }
 
   return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>

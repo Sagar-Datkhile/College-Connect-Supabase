@@ -6,15 +6,24 @@ import { ProfileView } from "./profile-view"
 import { ProfileEditor } from "./profile-editor"
 import { PrivacySettings } from "./privacy-settings"
 
-export function ProfileDashboard({ user, isOwnProfile = true }) {
+export function ProfileDashboard({ user, isOwnProfile = true, onSaveProfile }) {
   const [isEditing, setIsEditing] = useState(false)
   const [activeTab, setActiveTab] = useState("profile")
 
-  const handleSaveProfile = (profileData) => {
-    // In a real app, this would save to backend
-    console.log("Saving profile:", profileData)
-    setIsEditing(false)
-    // Show success message or update UI
+  const handleSaveProfile = async (profileData) => {
+    if (onSaveProfile) {
+      try {
+        await onSaveProfile(profileData)
+        setIsEditing(false)
+      } catch (error) {
+        console.error('Error saving profile:', error)
+        // Keep editing mode active if save fails
+      }
+    } else {
+      // Fallback behavior if no onSaveProfile prop provided
+      console.log("Saving profile:", profileData)
+      setIsEditing(false)
+    }
   }
 
   const handleSavePrivacy = (privacySettings) => {

@@ -4,6 +4,10 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin"
 // Verify Firebase ID token
 async function verifyToken(request) {
   try {
+    if (!adminAuth) {
+      throw new Error("Firebase Admin not properly configured")
+    }
+    
     const authHeader = request.headers.get("authorization")
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       throw new Error("No token provided")
@@ -20,6 +24,13 @@ async function verifyToken(request) {
 // GET - Fetch users (admin only)
 export async function GET(request) {
   try {
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: "Firebase Admin not configured. Please check your environment variables." },
+        { status: 500 }
+      )
+    }
+    
     const decodedToken = await verifyToken(request)
 
     // Check if user is admin
@@ -49,6 +60,13 @@ export async function GET(request) {
 // PUT - Update user (admin only)
 export async function PUT(request) {
   try {
+    if (!adminDb || !adminAuth) {
+      return NextResponse.json(
+        { error: "Firebase Admin not configured. Please check your environment variables." },
+        { status: 500 }
+      )
+    }
+    
     const decodedToken = await verifyToken(request)
     const { userId, updates } = await request.json()
 
@@ -86,6 +104,13 @@ export async function PUT(request) {
 // DELETE - Delete user (admin only)
 export async function DELETE(request) {
   try {
+    if (!adminDb || !adminAuth) {
+      return NextResponse.json(
+        { error: "Firebase Admin not configured. Please check your environment variables." },
+        { status: 500 }
+      )
+    }
+    
     const decodedToken = await verifyToken(request)
     const { userId } = await request.json()
 
