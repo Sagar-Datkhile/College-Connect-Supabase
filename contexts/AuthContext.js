@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { auth, db, isFirebaseConfigured } from "@/lib/firebase"
+import supabase, { isSupabaseConfigured } from "@/lib/supabase"
 
 const AuthContext = createContext({})
 
@@ -19,13 +19,13 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Sign up function with Firebase or mock implementation
+  // Sign up function with Supabase or mock implementation
   const signUp = async (email, password, userData) => {
     setError(null)
     setLoading(true)
 
     try {
-      if (!isFirebaseConfigured || !auth || !db) {
+      if (!isSupabaseConfigured || !supabase) {
         // Mock implementation for demo
         const mockUser = {
           uid: "mock-uid-" + Date.now(),
@@ -45,48 +45,38 @@ export const AuthProvider = ({ children }) => {
           createdAt: new Date(),
         })
         setLoading(false)
-        return { user: mockUser, message: "Demo account created! Firebase not configured." }
+        return { user: mockUser, message: "Demo account created! Supabase not configured." }
       }
 
-      const { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } = await import("firebase/auth")
-      const { doc, setDoc } = await import("firebase/firestore")
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password, options: { data: { name: userData.name } } })
+      if (signUpError) throw signUpError
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-      const user = userCredential.user
-
-      await updateProfile(user, { displayName: userData.name })
-
-      // Create user profile in Firestore
+      const authUser = signUpData.user
       const userProfileData = {
-        uid: user.uid,
+        id: authUser.id,
+        uid: authUser.id,
         name: userData.name,
-        email: user.email,
+        email: authUser.email,
         role: userData.role || "student",
         major: userData.major || "",
         graduationYear: userData.graduationYear || "",
         verified: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        profileComplete: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        profile_complete: false,
         bio: "",
         skills: [],
         interests: [],
-        socialLinks: {},
-        mentorshipStatus: userData.role === "alumni" ? "available" : "seeking",
+        social_links: {},
+        mentorship_status: userData.role === "alumni" ? "available" : "seeking",
       }
 
-      await setDoc(doc(db, "users", user.uid), userProfileData)
+      const { error: profileError } = await supabase.from("users").insert(userProfileData)
+      if (profileError) throw profileError
       setUserProfile(userProfileData)
 
-      // Send email verification
-      try {
-        await sendEmailVerification(user)
-      } catch (emailError) {
-        console.warn("Could not send verification email:", emailError)
-      }
-
       setLoading(false)
-      return { user, message: "Account created successfully! Please check your email for verification." }
+      return { user: authUser, message: "Account created successfully! Please check your email for verification." }
     } catch (error) {
       setLoading(false)
       setError(error.message)
@@ -94,13 +84,13 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  // Sign in function with Firebase or mock implementation
+  // Sign in function with Supabase or mock implementation
   const signIn = async (email, password) => {
     setError(null)
     setLoading(true)
 
     try {
-      if (!isFirebaseConfigured || !auth || !db) {
+      if (!isSupabaseConfigured || !supabase) {
         // Mock implementation for demo
         const isAdmin = email.includes("admin")
         const mockUser = {
@@ -124,15 +114,14 @@ export const AuthProvider = ({ children }) => {
         return { user: mockUser }
       }
 
-      const { signInWithEmailAndPassword } = await import("firebase/auth")
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      const user = userCredential.user
-      
-      // Fetch user profile after successful login
-      await fetchUserProfile(user.uid)
-      
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInError) throw signInError
+      const authUser = signInData.user
+
+      await fetchUserProfile(authUser.id)
+
       setLoading(false)
-      return { user }
+      return { user: authUser }
     } catch (error) {
       setLoading(false)
       setError(error.message)
@@ -145,15 +134,15 @@ export const AuthProvider = ({ children }) => {
     setError(null)
     
     try {
-      if (!isFirebaseConfigured || !auth) {
+      if (!isSupabaseConfigured || !supabase) {
         // Mock implementation
         setUser(null)
         setUserProfile(null)
         return
       }
 
-      const { signOut } = await import("firebase/auth")
-      await signOut(auth)
+      const { error: signOutError } = await supabase.auth.signOut()
+      if (signOutError) throw signOutError
       setUser(null)
       setUserProfile(null)
     } catch (error) {
@@ -167,7 +156,7 @@ export const AuthProvider = ({ children }) => {
     setError(null)
     
     try {
-      if (!isFirebaseConfigured || !db) {
+      if (!isSupabaseConfigured || !supabase) {
         // Mock implementation
         setUserProfile((prev) => ({ ...prev, ...updates }))
         return
@@ -177,36 +166,43 @@ export const AuthProvider = ({ children }) => {
         throw new Error("No user logged in")
       }
 
-      const { doc, updateDoc, setDoc, getDoc } = await import("firebase/firestore")
-      const userDocRef = doc(db, "users", user.uid)
-      
-      // Check if user document exists
-      const docSnap = await getDoc(userDocRef)
-      
-      if (docSnap.exists()) {
-        // Update existing document
-        await updateDoc(userDocRef, {
-          ...updates,
-          updatedAt: new Date(),
-        })
+      const { data: existing, error: selectError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", user.id || user.uid)
+        .single()
+      if (selectError && selectError.code !== 'PGRST116') throw selectError
+
+      const payload = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      }
+
+      if (existing) {
+        const { error: updateError } = await supabase
+          .from("users")
+          .update(payload)
+          .eq("id", user.id || user.uid)
+        if (updateError) throw updateError
       } else {
-        // Create new document if it doesn't exist
         const newProfile = {
-          uid: user.uid,
-          name: updates.name || user.displayName || '',
+          id: user.id || user.uid,
+          uid: user.id || user.uid,
+          name: updates.name || user.user_metadata?.name || '',
           email: user.email,
           role: updates.role || 'student',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          profileComplete: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          profile_complete: false,
           bio: '',
           skills: [],
           interests: [],
-          socialLinks: {},
-          mentorshipStatus: 'seeking',
+          social_links: {},
+          mentorship_status: 'seeking',
           ...updates
         }
-        await setDoc(userDocRef, newProfile)
+        const { error: insertError } = await supabase.from("users").insert(newProfile)
+        if (insertError) throw insertError
       }
       
       // Update local state
@@ -216,7 +212,7 @@ export const AuthProvider = ({ children }) => {
         updatedAt: new Date() 
       }))
       
-      console.log('Profile updated successfully in Firebase')
+      console.log('Profile updated successfully in Supabase')
     } catch (error) {
       console.error('Error updating profile:', error)
       setError(error.message)
@@ -226,26 +222,21 @@ export const AuthProvider = ({ children }) => {
 
   // Fetch user profile function
   const fetchUserProfile = async (uid) => {
-    if (!isFirebaseConfigured || !db) {
+    if (!isSupabaseConfigured || !supabase) {
       return userProfile
     }
 
     try {
-      const { doc, getDoc } = await import("firebase/firestore")
-      const docRef = doc(db, "users", uid)
-      const docSnap = await getDoc(docRef)
-
-      if (docSnap.exists()) {
-        const profile = docSnap.data()
-        setUserProfile(profile)
-        console.log('User profile fetched successfully:', profile)
-        return profile
-      } else {
-        console.log("No user profile found for uid:", uid)
-        console.log("Profile will be created on first update")
-        setUserProfile(null)
-        return null
+      const { data, error } = await supabase.from("users").select("*").eq("id", uid).single()
+      if (error) {
+        if (error.code === 'PGRST116') {
+          setUserProfile(null)
+          return null
+        }
+        throw error
       }
+      setUserProfile(data)
+      return data
     } catch (error) {
       console.error("Error fetching user profile:", error)
       setError(error.message)
@@ -255,19 +246,18 @@ export const AuthProvider = ({ children }) => {
 
   // Listen for authentication state changes
   useEffect(() => {
-    if (!isFirebaseConfigured || !auth) {
+    if (!isSupabaseConfigured || !supabase) {
       setLoading(false)
       return
     }
 
-    const { onAuthStateChanged } = require("firebase/auth")
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {
-        if (user) {
-          setUser(user)
-          await fetchUserProfile(user.uid)
+        const authUser = session?.user || null
+        setUser(authUser)
+        if (authUser) {
+          await fetchUserProfile(authUser.id)
         } else {
-          setUser(null)
           setUserProfile(null)
         }
       } catch (error) {
@@ -278,8 +268,10 @@ export const AuthProvider = ({ children }) => {
       }
     })
 
-    return () => unsubscribe()
-  }, [isFirebaseConfigured])
+    return () => {
+      authListener.subscription?.unsubscribe?.()
+    }
+  }, [isSupabaseConfigured])
 
   const value = {
     user,
@@ -291,7 +283,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateUserProfile,
     fetchUserProfile,
-    isFirebaseConfigured,
+    isSupabaseConfigured,
   }
 
   return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>

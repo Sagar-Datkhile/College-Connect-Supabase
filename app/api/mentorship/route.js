@@ -1,21 +1,18 @@
 import { NextResponse } from "next/server"
-import { adminAuth, adminDb } from "@/lib/firebase-admin"
+import supabase from "@/lib/supabase"
 
-// Helper function to verify Firebase ID token
+// Helper function to verify Supabase JWT
 async function verifyToken(request) {
   try {
-    if (!adminAuth) {
-      throw new Error("Firebase Admin not properly configured")
-    }
-    
     const authHeader = request.headers.get("authorization")
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       throw new Error("No token provided")
     }
 
     const token = authHeader.split("Bearer ")[1]
-    const decodedToken = await adminAuth.verifyIdToken(token)
-    return decodedToken
+    const { data, error } = await supabase.auth.getUser(token)
+    if (error || !data?.user) throw new Error("Invalid token")
+    return data.user
   } catch (error) {
     throw new Error("Invalid token")
   }
@@ -24,34 +21,16 @@ async function verifyToken(request) {
 // GET - Fetch mentorship requests (can be filtered by mentorId or menteeId)
 export async function GET(request) {
   try {
-    if (!adminDb) {
-      return NextResponse.json(
-        { error: "Firebase Admin not configured. Please check your environment variables." },
-        { status: 500 }
-      )
-    }
-    
-    const decodedToken = await verifyToken(request)
+    const user = await verifyToken(request)
     const { searchParams } = new URL(request.url)
     const mentorId = searchParams.get("mentorId")
     const menteeId = searchParams.get("menteeId")
 
-    let mentorshipRef = adminDb.collection("mentorshipRequests")
-
-    if (mentorId) {
-      mentorshipRef = mentorshipRef.where("mentorId", "==", mentorId)
-    }
-    if (menteeId) {
-      mentorshipRef = mentorshipRef.where("menteeId", "==", menteeId)
-    }
-
-    const mentorshipSnapshot = await mentorshipRef.orderBy("createdAt", "desc").get()
-    const mentorshipRequests = mentorshipSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
-      updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || null,
-    }))
+    let query = supabase.from("mentorship_requests").select("*").order("created_at", { ascending: false })
+    if (mentorId) query = query.eq("mentor_id", mentorId)
+    if (menteeId) query = query.eq("mentee_id", menteeId)
+    const { data: mentorshipRequests, error } = await query
+    if (error) throw error
 
     return NextResponse.json({ mentorshipRequests })
   } catch (error) {
@@ -63,32 +42,26 @@ export async function GET(request) {
 // POST - Create a new mentorship request
 export async function POST(request) {
   try {
-    if (!adminDb) {
-      return NextResponse.json(
-        { error: "Firebase Admin not configured. Please check your environment variables." },
-        { status: 500 }
-      )
-    }
-    
-    const decodedToken = await verifyToken(request)
+    const user = await verifyToken(request)
     const { mentorId, message } = await request.json()
 
     if (!mentorId || !message) {
       return NextResponse.json({ error: "Mentor ID and message are required" }, { status: 400 })
     }
 
-    const newRequestRef = adminDb.collection("mentorshipRequests").doc()
-    await newRequestRef.set({
-      mentorId,
-      menteeId: decodedToken.uid,
-      menteeEmail: decodedToken.email,
+    const payload = {
+      mentor_id: mentorId,
+      mentee_id: user.id,
+      mentee_email: user.email,
       message,
-      status: "pending", // pending, accepted, rejected, cancelled
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
+      status: "pending",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    const { data, error } = await supabase.from("mentorship_requests").insert(payload).select("id").single()
+    if (error) throw error
 
-    return NextResponse.json({ id: newRequestRef.id, message: "Mentorship request sent successfully" }, { status: 201 })
+    return NextResponse.json({ id: data.id, message: "Mentorship request sent successfully" }, { status: 201 })
   } catch (error) {
     console.error("Error creating mentorship request:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -98,39 +71,37 @@ export async function POST(request) {
 // PUT - Update a mentorship request (e.g., accept/reject by mentor, cancel by mentee)
 export async function PUT(request) {
   try {
-    if (!adminDb) {
-      return NextResponse.json(
-        { error: "Firebase Admin not configured. Please check your environment variables." },
-        { status: 500 }
-      )
-    }
-    
-    const decodedToken = await verifyToken(request)
+    const user = await verifyToken(request)
     const { id, status } = await request.json()
 
     if (!id || !status) {
       return NextResponse.json({ error: "Request ID and status are required" }, { status: 400 })
     }
 
-    const requestRef = adminDb.collection("mentorshipRequests").doc(id)
-    const requestDoc = await requestRef.get()
-
-    if (!requestDoc.exists) {
-      return NextResponse.json({ error: "Mentorship request not found" }, { status: 404 })
+    const { data: requestData, error: findError } = await supabase
+      .from("mentorship_requests")
+      .select("*")
+      .eq("id", id)
+      .single()
+    if (findError) {
+      if (findError.code === 'PGRST116') return NextResponse.json({ error: "Mentorship request not found" }, { status: 404 })
+      throw findError
     }
-
-    const requestData = requestDoc.data()
 
     // Authorization logic:
     // Mentor can accept/reject
     // Mentee can cancel
     // Admin can do anything
-    const userDoc = await adminDb.collection("users").doc(decodedToken.uid).get()
-    const userData = userDoc.data()
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+    if (profileError) throw profileError
 
-    const isMentor = requestData.mentorId === decodedToken.uid
-    const isMentee = requestData.menteeId === decodedToken.uid
-    const isAdmin = userData && userData.role === "admin"
+    const isMentor = requestData.mentor_id === user.id
+    const isMentee = requestData.mentee_id === user.id
+    const isAdmin = profile && profile.role === "admin"
 
     if (status === "accepted" || status === "rejected") {
       if (!isMentor && !isAdmin) {
@@ -144,10 +115,11 @@ export async function PUT(request) {
       return NextResponse.json({ error: "Invalid status update" }, { status: 400 })
     }
 
-    await requestRef.update({
-      status,
-      updatedAt: new Date(),
-    })
+    const { error } = await supabase
+      .from("mentorship_requests")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", id)
+    if (error) throw error
 
     return NextResponse.json({ message: "Mentorship request updated successfully" })
   } catch (error) {
@@ -159,38 +131,36 @@ export async function PUT(request) {
 // DELETE - Delete a mentorship request (only by mentee or admin)
 export async function DELETE(request) {
   try {
-    if (!adminDb) {
-      return NextResponse.json(
-        { error: "Firebase Admin not configured. Please check your environment variables." },
-        { status: 500 }
-      )
-    }
-    
-    const decodedToken = await verifyToken(request)
+    const user = await verifyToken(request)
     const { id } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: "Request ID is required" }, { status: 400 })
     }
 
-    const requestRef = adminDb.collection("mentorshipRequests").doc(id)
-    const requestDoc = await requestRef.get()
-
-    if (!requestDoc.exists) {
-      return NextResponse.json({ error: "Mentorship request not found" }, { status: 404 })
+    const { data: requestData, error: findError } = await supabase
+      .from("mentorship_requests")
+      .select("*")
+      .eq("id", id)
+      .single()
+    if (findError) {
+      if (findError.code === 'PGRST116') return NextResponse.json({ error: "Mentorship request not found" }, { status: 404 })
+      throw findError
     }
 
-    const requestData = requestDoc.data()
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+    if (profileError) throw profileError
 
-    // Only the mentee who created the request or an admin can delete it
-    const userDoc = await adminDb.collection("users").doc(decodedToken.uid).get()
-    const userData = userDoc.data()
-
-    if (requestData.menteeId !== decodedToken.uid && (!userData || userData.role !== "admin")) {
+    if (requestData.mentee_id !== user.id && (!profile || profile.role !== "admin")) {
       return NextResponse.json({ error: "Unauthorized to delete this request" }, { status: 403 })
     }
 
-    await requestRef.delete()
+    const { error } = await supabase.from("mentorship_requests").delete().eq("id", id)
+    if (error) throw error
 
     return NextResponse.json({ message: "Mentorship request deleted successfully" })
   } catch (error) {
