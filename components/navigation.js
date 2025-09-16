@@ -33,7 +33,7 @@ export default function Navigation() {
       <nav className="flex justify-between items-center p-4 bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="flex items-center">
           <GraduationCap className="h-6 w-6 text-blue-600 mr-2" />
-          <Link href="/" className="font-bold text-lg text-gray-900">College Connect</Link>
+          <Link href="/" className="font-bold text-lg text-gray-900">Scholar Mentor</Link>
         </div>
         <LoadingSpinner size="sm" />
       </nav>
@@ -45,7 +45,7 @@ export default function Navigation() {
       <nav className="flex justify-between items-center p-4 bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="flex items-center">
           <GraduationCap className="h-6 w-6 text-blue-600 mr-2" />
-          <Link href="/" className="font-bold text-lg text-gray-900">College Connect</Link>
+          <Link href="/" className="font-bold text-lg text-gray-900">Scholar Mentor</Link>
         </div>
         
         {/* Desktop Navigation */}
