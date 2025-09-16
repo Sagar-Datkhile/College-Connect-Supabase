@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import { useRouter } from 'next/navigation';
-import { GraduationCap, LogOut, User, Menu, X } from 'lucide-react';
+import { GraduationCap, LogOut, User, Menu, X, BookOpen } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { LoadingSpinner } from './ui/loading';
 import { useState } from 'react';
@@ -51,7 +51,13 @@ export default function Navigation() {
         {/* Desktop Navigation */}
         <div className="hidden md:block">
           {user ? (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-4">
+                <Link href="/posts" className="flex items-center gap-1 text-sm text-gray-700 hover:text-blue-600 transition-colors">
+                  <BookOpen className="h-4 w-4" />
+                  Blog Posts
+                </Link>
+              </div>
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-gray-500" />
                 <span className="text-sm text-gray-700 max-w-32 truncate">
@@ -79,6 +85,10 @@ export default function Navigation() {
             </div>
           ) : (
             <div className="flex items-center gap-4">
+              <Link href="/posts" className="flex items-center gap-1 text-sm text-gray-700 hover:text-blue-600 transition-colors">
+                <BookOpen className="h-4 w-4" />
+                Blog Posts
+              </Link>
               <Link href="/login">
                 <Button variant="outline" size="sm">Login</Button>
               </Link>
@@ -105,6 +115,12 @@ export default function Navigation() {
           <div className="p-4 space-y-4">
             {user ? (
               <>
+                <Link href="/posts" onClick={() => setIsMenuOpen(false)}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start">
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Blog Posts
+                  </Button>
+                </Link>
                 <div className="flex items-center gap-2 pb-2 border-b">
                   <User className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-700">
@@ -136,6 +152,12 @@ export default function Navigation() {
               </>
             ) : (
               <div className="space-y-2">
+                <Link href="/posts" onClick={() => setIsMenuOpen(false)}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start">
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Blog Posts
+                  </Button>
+                </Link>
                 <Link href="/login" onClick={() => setIsMenuOpen(false)}>
                   <Button variant="outline" size="sm" className="w-full justify-start">Login</Button>
                 </Link>

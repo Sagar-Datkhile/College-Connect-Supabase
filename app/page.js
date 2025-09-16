@@ -166,7 +166,7 @@ export default function CollegePlatform() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
+      <div className="relative overflow-hidden bg-gradient-to-br from-gray-400 via-gray-500 to-gray-800 text-white">
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-grid-white/[0.1] bg-[size:16px_16px]" />
         <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 via-transparent to-transparent" />
@@ -188,7 +188,7 @@ export default function CollegePlatform() {
             {!user && (
               <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12">
                 <Link href="/login">
-                  <Button size="lg" variant="outline" className="px-8 py-3 text-white border-white/30 backdrop-blur-sm hover:bg-white/10 hover:border-white hover:text-white transition-all duration-300 rounded-full">
+                  <Button size="lg" variant="outline" className="px-8 py-3 text-black border-white/30 backdrop-blur-sm hover:bg-white/10 hover:border-white hover:text-white transition-all duration-300 rounded-full">
                     <LogIn className="h-5 w-5 mr-2" />
                     Sign In
                   </Button>
